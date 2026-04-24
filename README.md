@@ -14,8 +14,8 @@ A personal Telegram AI assistant that can initiate conversations on a schedule, 
 ### 1. Get the code
 
 ```bash
-git clone <repo-url> /opt/life-agent
-cd /opt/life-agent
+git clone <repo-url> /opt/claude-life-agent
+cd /opt/claude-life-agent
 ```
 
 ### 2. Create a virtual environment and install dependencies
@@ -52,32 +52,32 @@ Send yourself a message on Telegram. Ctrl+C to stop once it's working.
 
 ### Install and enable the service
 
-Edit `life-agent.service` and replace `YOUR_USERNAME` with your Linux username. If you installed to a path other than `/opt/life-agent`, update `WorkingDirectory` and `ExecStart` to match.
+Edit `claude-life-agent.service` and replace `YOUR_USERNAME` with your Linux username. If you installed to a path other than `/opt/claude-life-agent`, update `WorkingDirectory` and `ExecStart` to match.
 
 ```bash
-sudo cp life-agent.service /etc/systemd/system/
+sudo cp claude-life-agent.service /etc/systemd/system/
 sudo systemctl daemon-reload
-sudo systemctl enable life-agent
-sudo systemctl start life-agent
+sudo systemctl enable claude-life-agent
+sudo systemctl start claude-life-agent
 ```
 
 ### Useful commands
 
 ```bash
 # Check status
-sudo systemctl status life-agent
+sudo systemctl status claude-life-agent
 
 # View live logs
-sudo journalctl -u life-agent -f
+sudo journalctl -u claude-life-agent -f
 
 # View recent logs
-sudo journalctl -u life-agent -n 100
+sudo journalctl -u claude-life-agent -n 100
 
 # Restart after config changes
-sudo systemctl restart life-agent
+sudo systemctl restart claude-life-agent
 
 # Stop
-sudo systemctl stop life-agent
+sudo systemctl stop claude-life-agent
 ```
 
 ### Log retention
