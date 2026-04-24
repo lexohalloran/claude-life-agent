@@ -1,0 +1,18 @@
+[Unit]
+Description=Claude Life Agent
+Documentation=file:/opt/life-agent/README.md
+After=network-online.target
+Wants=network-online.target
+
+[Service]
+Type=simple
+User=YOUR_USERNAME
+WorkingDirectory=/opt/life-agent
+EnvironmentFile=/opt/life-agent/.env
+ExecStart=/opt/life-agent/venv/bin/python main.py
+Restart=on-failure
+RestartSec=10
+SyslogIdentifier=life-agent
+
+[Install]
+WantedBy=multi-user.target
