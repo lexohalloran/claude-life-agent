@@ -14,8 +14,8 @@ A personal Telegram AI assistant that can initiate conversations on a schedule, 
 ### 1. Get the code
 
 ```bash
-git clone <repo-url> /opt/claude-life-agent
-cd /opt/claude-life-agent
+git clone <repo-url> ~/services/claude-life-agent
+cd ~/services/claude-life-agent
 ```
 
 ### 2. Create a virtual environment and install dependencies
@@ -52,7 +52,7 @@ Send yourself a message on Telegram. Ctrl+C to stop once it's working.
 
 ### Install and enable the service
 
-Edit `claude-life-agent.service` and replace `YOUR_USERNAME` with your Linux username. If you installed to a path other than `/opt/claude-life-agent`, update `WorkingDirectory` and `ExecStart` to match.
+Edit `claude-life-agent.service` and replace `YOUR_USERNAME` with your Linux username. If you installed to a path other than `~/services/claude-life-agent`, update `WorkingDirectory` and `ExecStart` to match.
 
 ```bash
 sudo cp claude-life-agent.service /etc/systemd/system/

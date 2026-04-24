@@ -1,15 +1,15 @@
 [Unit]
 Description=Claude Life Agent
-Documentation=file:/opt/claude-life-agent/README.md
+Documentation=file:/home/YOUR_USERNAME/services/claude-life-agent/README.md
 After=network-online.target
 Wants=network-online.target
 
 [Service]
 Type=simple
 User=YOUR_USERNAME
-WorkingDirectory=/opt/claude-life-agent
-EnvironmentFile=/opt/claude-life-agent/.env
-ExecStart=/opt/claude-life-agent/venv/bin/python main.py
+WorkingDirectory=/home/YOUR_USERNAME/services/claude-life-agent
+EnvironmentFile=/home/YOUR_USERNAME/services/claude-life-agent/.env
+ExecStart=/home/YOUR_USERNAME/services/claude-life-agent/venv/bin/python main.py
 Restart=on-failure
 RestartSec=10
 SyslogIdentifier=claude-life-agent
