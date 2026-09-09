@@ -16,6 +16,7 @@ import anthropic
 
 import config
 import tools
+import usage
 
 logger = logging.getLogger(__name__)
 
@@ -34,11 +35,14 @@ def send_message(
     system_prompt: str | list[dict[str, Any]],
     history: list[dict[str, Any]],
     user_message: str,
+    source: str = "unknown",
 ) -> str:
     """Send a message to Claude and return the final text response.
 
     Handles the tool-use loop transparently: tool calls are executed and
     fed back to Claude until it produces a plain text reply.
+
+    `source` labels the caller ("telegram", "scheduled", ...) in the usage log.
 
     Raises anthropic.APIError subclasses on failure so callers can send
     appropriate user-facing messages.
@@ -54,6 +58,7 @@ def send_message(
         )
 
         response = _api_call_with_retry(messages, system_prompt)
+        usage.log_call(response, source=source, round_num=round_num)
 
         logger.info("Claude stop_reason=%s", response.stop_reason)
 

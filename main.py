@@ -50,6 +50,7 @@ async def on_message(user_text: str) -> str:
             system_prompt=system_prompt,
             history=history,
             user_message=stamped,
+            source="telegram",
         )
     except anthropic.AuthenticationError:
         logger.error("Anthropic authentication error — check API key and account credits")

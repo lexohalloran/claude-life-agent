@@ -14,6 +14,7 @@ CLAUDE_NOTES_FILE = DATA_DIR / "claude_notes.md"
 LIFE_DOC_FILE = DATA_DIR / "life_doc.md"
 CONVERSATION_LOG_FILE = DATA_DIR / "conversation_log.json"
 SCHEDULE_FILE = DATA_DIR / "schedule.json"
+USAGE_LOG_FILE = DATA_DIR / "usage_log.jsonl"
 
 # Anthropic
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]

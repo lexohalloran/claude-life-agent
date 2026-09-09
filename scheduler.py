@@ -98,6 +98,7 @@ async def _fire(bot: Bot, entry: dict, late_minutes: int = 0) -> None:
             system_prompt=system_prompt,
             history=history,
             user_message=trigger_text,
+            source="scheduled",
         )
     except Exception:
         logger.exception("Claude API call failed for scheduled message id=%s", entry["id"])
