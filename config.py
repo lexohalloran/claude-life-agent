@@ -26,8 +26,12 @@ MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
 TELEGRAM_ALLOWED_CHAT_ID = int(os.getenv("TELEGRAM_ALLOWED_CHAT_ID") or "0")
 
-# Conversation
-CONVERSATION_HISTORY_LIMIT = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "20"))
+# Conversation: history is every message not yet covered by a day summary.
+# This is only a runaway guard for when the maintenance pass has been failing.
+CONVERSATION_MAX_MESSAGES = int(os.getenv("CONVERSATION_MAX_MESSAGES", "200"))
+
+# How many past days of summaries to carry in the system prompt
+CONVERSATION_SUMMARY_DAYS = int(os.getenv("CONVERSATION_SUMMARY_DAYS", "14"))
 
 # Scheduler: messages overdue by more than this are dropped rather than sent
 SCHEDULER_GRACE_PERIOD_HOURS = float(os.getenv("SCHEDULER_GRACE_PERIOD_HOURS", "24"))

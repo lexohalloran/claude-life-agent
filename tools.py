@@ -381,6 +381,12 @@ def drain_outbox() -> list[str]:
     return messages
 
 
+def last_summarized_date() -> str | None:
+    """The most recent date with a written summary, or None if there are none."""
+    days = read_day_summaries(1)
+    return days[-1][0] if days else None
+
+
 def read_day_summaries(limit: int) -> list[tuple[str, str]]:
     """Return the most recent `limit` day summaries as (date, text), oldest first."""
     if not config.CONVERSATION_SUMMARIES_FILE.exists():

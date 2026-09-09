@@ -128,6 +128,18 @@ Its text output is discarded. It reaches you only if it decides something needs
 saying (most notably, when it has cancelled a reminder), so silence from it is
 the normal case.
 
+### How conversation memory is split
+
+Every message that hasn't yet been summarized is sent verbatim. Days that have
+been summarized are carried as summaries in the system prompt instead, where
+prompt caching applies.
+
+The boundary is the summaries file itself rather than a message count, which
+means yesterday stays verbatim until the pass summarizes it the next morning,
+and a run of failed passes keeps sending those days raw instead of dropping
+them. `CONVERSATION_MAX_MESSAGES` caps that if the pass has been broken for a
+long time.
+
 ## Inspecting cost
 
 `usage_log.jsonl` records every API call. To see how much prompt caching is

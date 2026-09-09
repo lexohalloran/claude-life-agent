@@ -6,6 +6,7 @@ from typing import Any
 from zoneinfo import ZoneInfo
 
 import config
+import tools
 
 logger = logging.getLogger(__name__)
 
@@ -15,13 +16,16 @@ _FALLBACK_SYSTEM_PROMPT = "You are a helpful personal assistant."
 def build_system_prompt() -> list[dict[str, Any]]:
     """Assemble the system prompt as a list of cached content blocks.
 
-    Each section (base, notes, life doc) gets its own cache_control breakpoint.
-    This means a change to the life doc only invalidates the life doc cache entry —
-    the base prompt and notes remain cache hits, paying ~10% of normal input cost.
+    Each section gets its own cache_control breakpoint. A cache entry is
+    invalidated by any change earlier in the prompt, so sections are ordered
+    most-stable first: the base prompt changes only when edited by hand, day
+    summaries gain one entry each morning, and notes and the life doc can change
+    at any point during a conversation.
     """
     base = _read_file(config.SYSTEM_PROMPT_FILE, _FALLBACK_SYSTEM_PROMPT)
     notes = _read_file(config.CLAUDE_NOTES_FILE, "")
     life_doc = _read_file(config.LIFE_DOC_FILE, "")
+    summaries = _format_day_summaries()
 
     blocks: list[dict[str, Any]] = [
         {
@@ -30,6 +34,17 @@ def build_system_prompt() -> list[dict[str, Any]]:
             "cache_control": {"type": "ephemeral"},
         }
     ]
+    if summaries:
+        blocks.append({
+            "type": "text",
+            "text": (
+                "\n\n---\n\n## Recent days\n\n"
+                "Summaries you wrote of previous days' conversations. Older days "
+                "have aged out; these are what you still have of them.\n\n"
+                + summaries
+            ),
+            "cache_control": {"type": "ephemeral"},
+        })
     if notes.strip():
         blocks.append({
             "type": "text",
@@ -63,6 +78,11 @@ def format_datetime(dt: datetime) -> str:
 def now_local() -> datetime:
     """Return the current time in the configured local timezone."""
     return datetime.now(ZoneInfo(config.TIMEZONE))
+
+
+def _format_day_summaries() -> str:
+    days = tools.read_day_summaries(config.CONVERSATION_SUMMARY_DAYS)
+    return "\n\n".join(f"### {date}\n\n{text}" for date, text in days)
 
 
 def _read_file(path, fallback: str) -> str:

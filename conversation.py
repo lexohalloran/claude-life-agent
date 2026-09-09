@@ -18,18 +18,47 @@ from datetime import datetime, timezone
 from typing import Any
 
 import config
+import tools
 
 logger = logging.getLogger(__name__)
 
 
 def load_history() -> list[dict[str, Any]]:
-    """Return the last N messages from the log, ready to pass to the API.
+    """Return every message not yet covered by a day summary.
 
-    Returns a list of {"role": ..., "content": ...} dicts with no extra fields,
-    trimmed to CONVERSATION_HISTORY_LIMIT.
+    Summarized days are carried in the system prompt instead, so the split is
+    driven by what the maintenance pass has actually written rather than by a
+    message count. Yesterday isn't summarized until the pass runs the following
+    morning, so between midnight and then its messages are still sent verbatim —
+    and if the pass fails for a few days, its days keep being sent rather than
+    silently vanishing.
+
+    Returns {"role", "content"} dicts with no extra fields.
     """
     raw = _read_log()
-    trimmed = raw[-config.CONVERSATION_HISTORY_LIMIT:]
+    if not raw:
+        return []
+
+    cutoff = tools.last_summarized_date()
+    if cutoff is None:
+        trimmed = raw
+    else:
+        start = next(
+            (i for i, m in enumerate(raw) if (d := _local_date(m)) and d > cutoff),
+            len(raw),
+        )
+        trimmed = raw[start:]
+
+    # Runaway guard: a long maintenance outage would otherwise send every
+    # message since it broke.
+    trimmed = trimmed[-config.CONVERSATION_MAX_MESSAGES:]
+
+    # The API rejects a first message that isn't a user turn. Messages are
+    # logged in user/assistant pairs, but a pair can straddle midnight and put
+    # an assistant turn first.
+    while trimmed and trimmed[0]["role"] != "user":
+        trimmed = trimmed[1:]
+
     return [{"role": m["role"], "content": m["content"]} for m in trimmed]
 
 
@@ -39,17 +68,7 @@ def messages_for_date(date_iso: str) -> list[dict[str, Any]]:
     Used by the daily maintenance pass to summarize a day. Entries predating
     timestamped logging, or with unparseable timestamps, are skipped.
     """
-    out = []
-    for m in _read_log():
-        stamp = m.get("timestamp")
-        if not stamp:
-            continue
-        try:
-            if datetime.fromisoformat(stamp).astimezone().date().isoformat() == date_iso:
-                out.append(m)
-        except ValueError:
-            continue
-    return out
+    return [m for m in _read_log() if _local_date(m) == date_iso]
 
 
 def append_message(role: str, content: str, source: str | None = None) -> None:
@@ -65,6 +84,17 @@ def append_message(role: str, content: str, source: str | None = None) -> None:
     raw.append(entry)
     _write_log(raw)
     logger.debug("Appended %s message to log (total=%d)", role, len(raw))
+
+
+def _local_date(message: dict[str, Any]) -> str | None:
+    """Local calendar date of a logged message, or None if it has no usable stamp."""
+    stamp = message.get("timestamp")
+    if not stamp:
+        return None
+    try:
+        return datetime.fromisoformat(stamp).astimezone().date().isoformat()
+    except ValueError:
+        return None
 
 
 def _read_log() -> list[dict[str, Any]]:
