@@ -10,6 +10,7 @@ Phase 5 tools: schedule_message, cancel_scheduled_message, list_scheduled_messag
 
 import json
 import logging
+import re
 import uuid
 from datetime import datetime, timezone, timedelta
 from typing import Any
@@ -151,6 +152,70 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
 ]
 
 
+# Tools available only during the daily maintenance pass, where there is no
+# user turn to reply into and the day's conversation needs recording.
+
+WRITE_DAY_SUMMARY_SCHEMA: dict[str, Any] = {
+    "name": "write_day_summary",
+    "description": (
+        "Record a summary of one day's conversation. This becomes your "
+        "long-term memory of that day once the raw messages age out of "
+        "context, so write what your future self would want to know. "
+        "Writing a date that already has a summary replaces it."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "date": {
+                "type": "string",
+                "description": "The day being summarized, as YYYY-MM-DD.",
+            },
+            "summary": {
+                "type": "string",
+                "description": (
+                    "A concise prose summary: emotional tone, ongoing threads, "
+                    "anything notable about the user, commitments made or "
+                    "completed. Not a transcript."
+                ),
+            },
+        },
+        "required": ["date", "summary"],
+    },
+}
+
+SEND_MESSAGE_TO_USER_SCHEMA: dict[str, Any] = {
+    "name": "send_message_to_user",
+    "description": (
+        "Send a message to the user. During maintenance your text response is "
+        "discarded, so this is the only way to reach them. Use it sparingly — "
+        "most maintenance runs should finish silently. Call it at most once."
+    ),
+    "input_schema": {
+        "type": "object",
+        "properties": {
+            "text": {
+                "type": "string",
+                "description": "The message to send.",
+            }
+        },
+        "required": ["text"],
+    },
+}
+
+_MAINTENANCE_TOOL_NAMES = {
+    "read_life_doc",
+    "read_claude_notes",
+    "edit_claude_notes",
+    "list_scheduled_messages",
+    "cancel_scheduled_message",
+    "schedule_message",
+}
+
+MAINTENANCE_TOOL_SCHEMAS: list[dict[str, Any]] = [
+    s for s in TOOL_SCHEMAS if s["name"] in _MAINTENANCE_TOOL_NAMES
+] + [WRITE_DAY_SUMMARY_SCHEMA, SEND_MESSAGE_TO_USER_SCHEMA]
+
+
 # ---------------------------------------------------------------------------
 # Phase 4 implementations: life doc and notes
 # ---------------------------------------------------------------------------
@@ -275,6 +340,80 @@ def list_scheduled_messages() -> str:
 
 
 # ---------------------------------------------------------------------------
+# Maintenance implementations: day summaries and reaching the user
+# ---------------------------------------------------------------------------
+
+_SUMMARY_HEADER = re.compile(r"^## (\d{4}-\d{2}-\d{2})\s*$")
+
+# Messages queued by send_message_to_user during a maintenance run. The tool
+# dispatcher is synchronous and has no handle on the Telegram bot, so the
+# scheduler drains this once the run finishes.
+_outbox: list[str] = []
+
+
+def write_day_summary(date: str, summary: str) -> str:
+    logger.info("Tool call: write_day_summary date=%s (%d chars)", date, len(summary))
+    existing = ""
+    if config.CONVERSATION_SUMMARIES_FILE.exists():
+        existing = config.CONVERSATION_SUMMARIES_FILE.read_text(encoding="utf-8")
+
+    sections = _parse_summaries(existing)
+    replaced = date in sections
+    sections[date] = summary.strip()
+
+    config.DATA_DIR.mkdir(parents=True, exist_ok=True)
+    config.CONVERSATION_SUMMARIES_FILE.write_text(
+        _render_summaries(sections), encoding="utf-8"
+    )
+    return f"{'Replaced' if replaced else 'Wrote'} summary for {date}."
+
+
+def send_message_to_user(text: str) -> str:
+    logger.info("Tool call: send_message_to_user (%d chars)", len(text))
+    _outbox.append(text)
+    return "Queued. It will be delivered when this maintenance run finishes."
+
+
+def drain_outbox() -> list[str]:
+    """Return and clear anything send_message_to_user queued."""
+    global _outbox
+    messages, _outbox = _outbox, []
+    return messages
+
+
+def read_day_summaries(limit: int) -> list[tuple[str, str]]:
+    """Return the most recent `limit` day summaries as (date, text), oldest first."""
+    if not config.CONVERSATION_SUMMARIES_FILE.exists():
+        return []
+    sections = _parse_summaries(
+        config.CONVERSATION_SUMMARIES_FILE.read_text(encoding="utf-8")
+    )
+    return sorted(sections.items())[-limit:]
+
+
+def _parse_summaries(text: str) -> dict[str, str]:
+    sections: dict[str, str] = {}
+    current: str | None = None
+    buf: list[str] = []
+    for line in text.splitlines():
+        match = _SUMMARY_HEADER.match(line)
+        if match:
+            if current:
+                sections[current] = "\n".join(buf).strip()
+            current = match.group(1)
+            buf = []
+        elif current:
+            buf.append(line)
+    if current:
+        sections[current] = "\n".join(buf).strip()
+    return sections
+
+
+def _render_summaries(sections: dict[str, str]) -> str:
+    return "\n".join(f"## {date}\n\n{text}\n" for date, text in sorted(sections.items()))
+
+
+# ---------------------------------------------------------------------------
 # Schedule file helpers
 # ---------------------------------------------------------------------------
 
@@ -322,6 +461,10 @@ def dispatch(tool_name: str, tool_input: dict[str, Any]) -> str:
             return cancel_scheduled_message(tool_input["id"])
         case "list_scheduled_messages":
             return list_scheduled_messages()
+        case "write_day_summary":
+            return write_day_summary(tool_input["date"], tool_input["summary"])
+        case "send_message_to_user":
+            return send_message_to_user(tool_input["text"])
         case _:
             logger.warning("Unknown tool called: %s", tool_name)
             return f"Error: unknown tool '{tool_name}'"

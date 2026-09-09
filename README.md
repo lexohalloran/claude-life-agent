@@ -105,6 +105,40 @@ All data lives in `data/` (gitignored):
 | `claude_notes.md` | Agent's notes about you | Agent only |
 | `life_doc.md` | Ongoing life context | You and the agent |
 | `conversation_log.json` | Message history | Agent only |
+| `conversation_summaries.md` | One summary per past day | Agent only |
 | `schedule.json` | Pending scheduled messages | Agent only |
+| `maintenance_state.json` | Date the daily pass last ran | Agent only |
+| `usage_log.jsonl` | Token usage, one line per API call | Agent only |
 
 You can edit `life_doc.md` directly at any time.
+
+## Daily maintenance
+
+Once a day at `MAINTENANCE_HOUR` (default 4am local), the scheduler wakes the
+agent for a housekeeping pass. It reviews pending scheduled messages against
+recent conversation, writes a summary of the previous day into
+`conversation_summaries.md`, and consolidates `claude_notes.md` to keep it from
+growing without bound.
+
+The pass runs whether or not the agent remembers to schedule it — it is driven
+by the scheduler loop, not by the agent's own scheduling tools, so it cannot
+drift or be cancelled by mistake.
+
+Its text output is discarded. It reaches you only if it decides something needs
+saying (most notably, when it has cancelled a reminder), so silence from it is
+the normal case.
+
+## Inspecting cost
+
+`usage_log.jsonl` records every API call. To see how much prompt caching is
+actually saving:
+
+```bash
+jq -s 'group_by(.source)[] | {source: .[0].source, calls: length,
+  cache_write: (map(.cache_creation_input_tokens) | add),
+  cache_read: (map(.cache_read_input_tokens) | add),
+  uncached: (map(.input_tokens) | add)}' data/usage_log.jsonl
+```
+
+Cache reads cost 10% of base rate and writes cost 125%, so writes that are
+never read back are worse than not caching at all.

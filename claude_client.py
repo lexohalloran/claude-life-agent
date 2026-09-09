@@ -36,6 +36,7 @@ def send_message(
     history: list[dict[str, Any]],
     user_message: str,
     source: str = "unknown",
+    tool_schemas: list[dict[str, Any]] | None = None,
 ) -> str:
     """Send a message to Claude and return the final text response.
 
@@ -43,10 +44,15 @@ def send_message(
     fed back to Claude until it produces a plain text reply.
 
     `source` labels the caller ("telegram", "scheduled", ...) in the usage log.
+    `tool_schemas` overrides the tool set — the maintenance pass uses a
+    different one from normal conversation.
 
     Raises anthropic.APIError subclasses on failure so callers can send
     appropriate user-facing messages.
     """
+    if tool_schemas is None:
+        tool_schemas = tools.TOOL_SCHEMAS
+
     messages: list[dict[str, Any]] = history + [
         {"role": "user", "content": user_message}
     ]
@@ -57,7 +63,7 @@ def send_message(
             config.MODEL, len(messages) - 1, round_num,
         )
 
-        response = _api_call_with_retry(messages, system_prompt)
+        response = _api_call_with_retry(messages, system_prompt, tool_schemas)
         usage.log_call(response, source=source, round_num=round_num)
 
         logger.info("Claude stop_reason=%s", response.stop_reason)
@@ -106,6 +112,7 @@ def send_message(
 def _api_call_with_retry(
     messages: list[dict[str, Any]],
     system_prompt: str | list[dict[str, Any]],
+    tool_schemas: list[dict[str, Any]],
 ) -> anthropic.types.Message:
     """Make one API call, retrying once on transient errors."""
     try:
@@ -113,7 +120,7 @@ def _api_call_with_retry(
             model=config.MODEL,
             max_tokens=4096,
             system=system_prompt,
-            tools=tools.TOOL_SCHEMAS,
+            tools=tool_schemas,
             messages=messages,
         )
     except _RETRYABLE as e:
@@ -123,6 +130,6 @@ def _api_call_with_retry(
             model=config.MODEL,
             max_tokens=4096,
             system=system_prompt,
-            tools=tools.TOOL_SCHEMAS,
+            tools=tool_schemas,
             messages=messages,
         )

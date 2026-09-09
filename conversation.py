@@ -33,6 +33,25 @@ def load_history() -> list[dict[str, Any]]:
     return [{"role": m["role"], "content": m["content"]} for m in trimmed]
 
 
+def messages_for_date(date_iso: str) -> list[dict[str, Any]]:
+    """Return every logged message whose local timestamp falls on `date_iso`.
+
+    Used by the daily maintenance pass to summarize a day. Entries predating
+    timestamped logging, or with unparseable timestamps, are skipped.
+    """
+    out = []
+    for m in _read_log():
+        stamp = m.get("timestamp")
+        if not stamp:
+            continue
+        try:
+            if datetime.fromisoformat(stamp).astimezone().date().isoformat() == date_iso:
+                out.append(m)
+        except ValueError:
+            continue
+    return out
+
+
 def append_message(role: str, content: str, source: str | None = None) -> None:
     """Append a single message to the conversation log."""
     raw = _read_log()

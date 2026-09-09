@@ -15,6 +15,8 @@ LIFE_DOC_FILE = DATA_DIR / "life_doc.md"
 CONVERSATION_LOG_FILE = DATA_DIR / "conversation_log.json"
 SCHEDULE_FILE = DATA_DIR / "schedule.json"
 USAGE_LOG_FILE = DATA_DIR / "usage_log.jsonl"
+CONVERSATION_SUMMARIES_FILE = DATA_DIR / "conversation_summaries.md"
+MAINTENANCE_STATE_FILE = DATA_DIR / "maintenance_state.json"
 
 # Anthropic
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
@@ -29,6 +31,9 @@ CONVERSATION_HISTORY_LIMIT = int(os.getenv("CONVERSATION_HISTORY_LIMIT", "20"))
 
 # Scheduler: messages overdue by more than this are dropped rather than sent
 SCHEDULER_GRACE_PERIOD_HOURS = float(os.getenv("SCHEDULER_GRACE_PERIOD_HOURS", "24"))
+
+# Daily maintenance pass runs at the first tick on or after this local hour
+MAINTENANCE_HOUR = int(os.getenv("MAINTENANCE_HOUR", "4"))
 
 # Timezone
 TIMEZONE = os.getenv("TIMEZONE", "America/Los_Angeles")
