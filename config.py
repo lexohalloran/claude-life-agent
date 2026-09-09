@@ -18,7 +18,7 @@ USAGE_LOG_FILE = DATA_DIR / "usage_log.jsonl"
 
 # Anthropic
 ANTHROPIC_API_KEY = os.environ["ANTHROPIC_API_KEY"]
-MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-4-5")
+MODEL = os.getenv("CLAUDE_MODEL", "claude-sonnet-5")
 
 # Telegram
 TELEGRAM_BOT_TOKEN = os.getenv("TELEGRAM_BOT_TOKEN", "")
