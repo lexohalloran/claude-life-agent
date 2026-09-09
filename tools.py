@@ -104,7 +104,21 @@ TOOL_SCHEMAS: list[dict[str, Any]] = [
                     "type": "string",
                     "description": (
                         "A note to your future self about why this was scheduled "
-                        "and what to say or ask."
+                        "and what to say or ask. Always provide this, even when "
+                        "using direct_text — it's what you'll see when reviewing "
+                        "the schedule later."
+                    ),
+                },
+                "direct_text": {
+                    "type": "string",
+                    "description": (
+                        "Optional. Exact message text to send verbatim at the "
+                        "scheduled time, bypassing you entirely — you will not be "
+                        "consulted when it fires. Use this for reminders whose "
+                        "wording is fixed and doesn't depend on context "
+                        "(medication, recurring routines). Omit it when the "
+                        "message should reflect the situation at send time, so "
+                        "that you get to write it then."
                     ),
                 },
             },
@@ -180,8 +194,8 @@ def edit_claude_notes(new_content: str) -> str:
 # Phase 5 implementations: scheduling
 # ---------------------------------------------------------------------------
 
-def schedule_message(when: str, context: str) -> str:
-    logger.info("Tool call: schedule_message when=%s", when)
+def schedule_message(when: str, context: str, direct_text: str | None = None) -> str:
+    logger.info("Tool call: schedule_message when=%s direct=%s", when, bool(direct_text))
 
     # Parse and validate the requested time
     try:
@@ -219,12 +233,15 @@ def schedule_message(when: str, context: str) -> str:
         "context": context,
         "scheduled_at": now.isoformat(),
     }
+    if direct_text:
+        entry["direct_text"] = direct_text
     schedule.append(entry)
     _write_schedule(schedule)
 
     fire_local = fire_at.astimezone(ZoneInfo(config.TIMEZONE))
     logger.info("Scheduled message id=%s for %s", entry["id"], fire_local)
-    return f"Scheduled. ID: {entry['id']}. Will fire at {fire_local.strftime('%Y-%m-%d %H:%M %Z')}."
+    kind = "Will send verbatim" if direct_text else "Will fire"
+    return f"Scheduled. ID: {entry['id']}. {kind} at {fire_local.strftime('%Y-%m-%d %H:%M %Z')}."
 
 
 def cancel_scheduled_message(message_id: str) -> str:
@@ -246,11 +263,14 @@ def list_scheduled_messages() -> str:
     lines = []
     for entry in sorted(schedule, key=lambda e: e["when"]):
         fire_at = datetime.fromisoformat(entry["when"]).astimezone(tz)
-        lines.append(
+        line = (
             f"- ID {entry['id']}\n"
             f"  When: {fire_at.strftime('%Y-%m-%d %H:%M %Z')}\n"
             f"  Context: {entry['context']}"
         )
+        if entry.get("direct_text"):
+            line += f"\n  Sends verbatim (you will not be consulted): {entry['direct_text']}"
+        lines.append(line)
     return "\n".join(lines)
 
 
@@ -293,7 +313,11 @@ def dispatch(tool_name: str, tool_input: dict[str, Any]) -> str:
         case "edit_claude_notes":
             return edit_claude_notes(tool_input["new_content"])
         case "schedule_message":
-            return schedule_message(tool_input["when"], tool_input["context"])
+            return schedule_message(
+                tool_input["when"],
+                tool_input["context"],
+                tool_input.get("direct_text"),
+            )
         case "cancel_scheduled_message":
             return cancel_scheduled_message(tool_input["id"])
         case "list_scheduled_messages":

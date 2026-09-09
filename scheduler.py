@@ -70,7 +70,11 @@ async def _tick(bot: Bot) -> None:
 
 
 async def _fire(bot: Bot, entry: dict, late_minutes: int = 0) -> None:
-    """Call Claude for a scheduled entry and send the result via Telegram."""
+    """Send a scheduled entry, calling Claude to compose it unless it's direct."""
+    if entry.get("direct_text"):
+        await _fire_direct(bot, entry)
+        return
+
     now = utils.now_local()
     scheduled_at = datetime.fromisoformat(entry["scheduled_at"]).astimezone(
         ZoneInfo(config.TIMEZONE)
@@ -112,5 +116,24 @@ async def _fire(bot: Bot, entry: dict, late_minutes: int = 0) -> None:
 
     await bot.send_message(chat_id=config.TELEGRAM_ALLOWED_CHAT_ID, text=reply)
     logger.info("Sent scheduled message id=%s (%d chars)", entry["id"], len(reply))
+
+
+async def _fire_direct(bot: Bot, entry: dict) -> None:
+    """Send a fixed-text scheduled message without consulting Claude.
+
+    Logs a synthetic trigger alongside the message, mirroring the Claude path:
+    it tells future context that this went out mechanically, and keeps the log
+    in user/assistant pairs so a trimmed history never starts mid-exchange.
+    """
+    text = entry["direct_text"]
+    trigger_text = (
+        f"[Current time: {utils.format_datetime(utils.now_local())}]\n"
+        f"[Scheduled reminder fired automatically — sent verbatim, you were not consulted]"
+    )
+    conversation.append_message("user", trigger_text, source="scheduled-direct")
+    conversation.append_message("assistant", text, source="scheduled-direct")
+
+    await bot.send_message(chat_id=config.TELEGRAM_ALLOWED_CHAT_ID, text=text)
+    logger.info("Sent direct scheduled message id=%s (%d chars)", entry["id"], len(text))
 
 
